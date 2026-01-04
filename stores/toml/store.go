@@ -225,12 +225,11 @@ func (s *Store) EmitEncryptedFile(in sops.Tree) ([]byte, error) {
 		return nil, errTOMLUniqueDocument
 	}
 
-	data, err := treeBranchToMap(in.Branches[0])
+	tree := append(in.Branches[0], sops.TreeItem{Key: stores.SopsMetadataKey, Value: stores.MetadataFromInternal(in.Metadata)})
+	data, err := treeBranchToMap(tree)
 	if err != nil {
 		return nil, fmt.Errorf("error converting tree branch: %w", err)
 	}
-
-	data["sops"] = stores.MetadataFromInternal(in.Metadata)
 
 	return s.marshalTOML(data)
 }
