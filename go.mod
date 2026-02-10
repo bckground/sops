@@ -18,6 +18,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.95.0
 	github.com/aws/aws-sdk-go-v2/service/sts v1.41.5
 	github.com/blang/semver v3.5.1+incompatible
+	github.com/creachadair/tomledit v0.0.29
 	github.com/fatih/color v1.18.0
 	github.com/getsops/gopgagent v0.0.0-20241224165529-7044f28e491e
 	github.com/google/go-cmp v0.7.0
@@ -157,3 +158,5 @@ require (
 	google.golang.org/genproto/googleapis/api v0.0.0-20251111163417-95abcf5c77ba // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
+
+replace github.com/creachadair/tomledit => github.com/jcmfernandes/tomledit v0.0.0-20260209121915-eadb688e82f2

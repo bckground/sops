@@ -245,6 +245,8 @@ github.com/hashicorp/vault/api v1.22.0 h1:+HYFquE35/B74fHoIeXlZIP2YADVboaPjaSicH
 github.com/hashicorp/vault/api v1.22.0/go.mod h1:IUZA2cDvr4Ok3+NtK2Oq/r+lJeXkeCrHRmqdyWfpmGM=
 github.com/huaweicloud/huaweicloud-sdk-go-v3 v0.1.182 h1:B3W9acgpqu5XsN8v+W8SOTfqn/6n4JsjgoKBsm30HFY=
 github.com/huaweicloud/huaweicloud-sdk-go-v3 v0.1.182/go.mod h1:M+yna96Fx9o5GbIUnF3OvVvQGjgfVSyeJbV9Yb1z/wI=
+github.com/jcmfernandes/tomledit v0.0.0-20260209121915-eadb688e82f2 h1:N9aLYF6d8Kc9emXkusCMItE+DcDL/+poZlclOYQvVfQ=
+github.com/jcmfernandes/tomledit v0.0.0-20260209121915-eadb688e82f2/go.mod h1:XeEkiOyQ8PSKb1DB5DyhbWsxeD3MNOcnHvpD1itD9ls=
 github.com/json-iterator/go v1.1.13-0.20220915233716-71ac16282d12 h1:9Nu54bhS/H/Kgo2/7xNSUuC5G28VR8ljfrLKU2G4IjU=
 github.com/json-iterator/go v1.1.13-0.20220915233716-71ac16282d12/go.mod h1:TBzl5BIHNXfS9+C35ZyJaklL7mLDbgUkcgXzSLa8Tk0=
 github.com/keybase/go-keychain v0.0.1 h1:way+bWYa6lDppZoZcgMbYsvC7GxljxrskdNInRtuthU=
