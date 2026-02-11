@@ -852,7 +852,7 @@ func (store *Store) EmitEncryptedFile(in sops.Tree) ([]byte, error) {
 		return nil, fmt.Errorf("could not marshal metadata: %w", err)
 	}
 
-	// Concatenate
+	// Concatenate.
 	var buf bytes.Buffer
 	buf.Write(dataBytes)
 	if len(dataBytes) > 0 && !bytes.HasSuffix(dataBytes, []byte("\n")) {
@@ -860,6 +860,9 @@ func (store *Store) EmitEncryptedFile(in sops.Tree) ([]byte, error) {
 	}
 	buf.WriteByte('\n')
 	buf.Write(metaBytes)
+	if len(metaBytes) > 0 && !bytes.HasSuffix(metaBytes, []byte("\n")) {
+		buf.WriteByte('\n')
+	}
 
 	return buf.Bytes(), nil
 }
