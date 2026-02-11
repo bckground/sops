@@ -111,7 +111,8 @@ type Cipher interface {
 
 // Comment represents a comment in the sops tree for the file formats that actually support them.
 type Comment struct {
-	Value string
+	Value   string
+	Trailer bool // heading/section trailer comment (e.g., [section] # comment)
 }
 
 // TreeItem is an item inside sops's tree

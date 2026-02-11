@@ -116,7 +116,7 @@ func (store *Store) datumToGoValue(datum parser.Datum) (interface{}, error) {
 				}
 				result = append(result, val)
 				if ai.Trailer != "" {
-					result = append(result, sops.Comment{Value: store.cleanCommentText(ai.Trailer)})
+					result = append(result, sops.Comment{Value: store.cleanCommentText(ai.Trailer), Trailer: true})
 				}
 			case parser.Comments:
 				for _, line := range ai {
@@ -132,7 +132,7 @@ func (store *Store) datumToGoValue(datum parser.Datum) (interface{}, error) {
 		var branch sops.TreeBranch
 		if d.Trailer != "" {
 			branch = append(branch, sops.TreeItem{
-				Key:   sops.Comment{Value: store.cleanCommentText(d.Trailer)},
+				Key:   sops.Comment{Value: store.cleanCommentText(d.Trailer), Trailer: true},
 				Value: nil,
 			})
 		}
@@ -151,7 +151,7 @@ func (store *Store) datumToGoValue(datum parser.Datum) (interface{}, error) {
 			branch = append(branch, sops.TreeItem{Key: name, Value: val})
 			if kv.Value.Trailer != "" {
 				branch = append(branch, sops.TreeItem{
-					Key:   sops.Comment{Value: store.cleanCommentText(kv.Value.Trailer)},
+					Key:   sops.Comment{Value: store.cleanCommentText(kv.Value.Trailer), Trailer: true},
 					Value: nil,
 				})
 			}
@@ -198,7 +198,7 @@ func (store *Store) goSliceToParserValue(items []any) parser.Value {
 	var pendingComments parser.Comments
 	for _, item := range items {
 		if c, ok := item.(sops.Comment); ok {
-			if lastValueIdx >= 0 {
+			if c.Trailer && lastValueIdx >= 0 {
 				v := arr[lastValueIdx].(parser.Value)
 				v.Trailer = "# " + c.Value
 				arr[lastValueIdx] = v
@@ -224,25 +224,18 @@ func (store *Store) goSliceToParserValue(items []any) parser.Value {
 func (store *Store) goBranchToParserValue(branch sops.TreeBranch) parser.Value {
 	inline := parser.Inline{}
 	var pendingComments parser.Comments
-	isFirst := true
 	for _, item := range branch {
 		if c, ok := item.Key.(sops.Comment); ok {
-			if isFirst && inline.Trailer == "" {
+			if c.Trailer && inline.Trailer == "" {
 				inline.Trailer = "# " + c.Value
-			} else if len(inline.Items) > 0 {
+			} else if c.Trailer && len(inline.Items) > 0 {
 				lastKV := inline.Items[len(inline.Items)-1]
-				if lastKV.Value.Trailer == "" {
-					lastKV.Value.Trailer = "# " + c.Value
-				} else {
-					pendingComments = append(pendingComments, "# "+c.Value)
-				}
+				lastKV.Value.Trailer = "# " + c.Value
 			} else {
 				pendingComments = append(pendingComments, "# "+c.Value)
 			}
-			isFirst = false
 			continue
 		}
-		isFirst = false
 		key, ok := item.Key.(string)
 		if !ok {
 			continue
@@ -474,8 +467,16 @@ func (store *Store) LoadPlainFile(in []byte) (sops.TreeBranches, error) {
 			}
 		}
 
-		// Process items into tree items and parent-scope comments
+		// Heading trailer → first item in section
 		var sectionItems []sops.TreeItem
+		if heading != nil && heading.Trailer != "" {
+			sectionItems = append(sectionItems, sops.TreeItem{
+				Key:   sops.Comment{Value: store.cleanCommentText(heading.Trailer), Trailer: true},
+				Value: nil,
+			})
+		}
+
+		// Process items into tree items and parent-scope comments
 		var parentComments []sops.TreeItem
 
 		for _, item := range items {
@@ -507,20 +508,20 @@ func (store *Store) LoadPlainFile(in []byte) (sops.TreeBranches, error) {
 					}
 				}
 
-				// Trailing comments on complex values → before KV
+				sectionItems = append(sectionItems, sops.TreeItem{Key: name, Value: val})
+
+				// Trailing comments on complex values → after KV
 				if store.isComplexGoValue(val) && it.Value.Trailer != "" {
 					sectionItems = append(sectionItems, sops.TreeItem{
-						Key:   sops.Comment{Value: store.cleanCommentText(it.Value.Trailer)},
+						Key:   sops.Comment{Value: store.cleanCommentText(it.Value.Trailer), Trailer: true},
 						Value: nil,
 					})
 				}
 
-				sectionItems = append(sectionItems, sops.TreeItem{Key: name, Value: val})
-
 				// Trailing comments on scalar values → after KV
 				if !store.isComplexGoValue(val) && it.Value.Trailer != "" {
 					sectionItems = append(sectionItems, sops.TreeItem{
-						Key:   sops.Comment{Value: store.cleanCommentText(it.Value.Trailer)},
+						Key:   sops.Comment{Value: store.cleanCommentText(it.Value.Trailer), Trailer: true},
 						Value: nil,
 					})
 				}
@@ -582,15 +583,26 @@ func (store *Store) EmitPlainFile(in sops.TreeBranches) ([]byte, error) {
 	headingCommentBuf := &[]sops.TreeItem{}
 	store.walkBranch(branch, nil, doc, headingCommentBuf, false)
 
-	// Flush remaining heading comments as standalone comments on the last section.
+	// Flush remaining heading comments: try trailing on last KV, else standalone.
 	if len(*headingCommentBuf) > 0 {
 		lastSection := doc.Global
 		if len(doc.Sections) > 0 {
 			lastSection = doc.Sections[len(doc.Sections)-1]
 		}
-		for _, item := range *headingCommentBuf {
-			if c, ok := item.Key.(sops.Comment); ok {
-				lastSection.Items = append(lastSection.Items, parser.Comments{"# " + c.Value})
+		flushedAsTrailer := false
+		if len(*headingCommentBuf) == 1 && len(lastSection.Items) > 0 {
+			if lastKV, ok := lastSection.Items[len(lastSection.Items)-1].(*parser.KeyValue); ok && lastKV.Value.Trailer == "" {
+				if c, ok := (*headingCommentBuf)[0].Key.(sops.Comment); ok {
+					lastKV.Value.Trailer = "# " + c.Value
+					flushedAsTrailer = true
+				}
+			}
+		}
+		if !flushedAsTrailer {
+			for _, item := range *headingCommentBuf {
+				if c, ok := item.Key.(sops.Comment); ok {
+					lastSection.Items = append(lastSection.Items, parser.Comments{"# " + c.Value})
+				}
 			}
 		}
 	}
@@ -621,12 +633,20 @@ func (store *Store) walkBranch(branch sops.TreeBranch, prefix []string, doc *tom
 			}
 			*headingCommentBuf = nil
 		}
+		// If the first item is a trailer comment, use it as heading trailer.
+		if len(branch) > 0 {
+			if c, ok := branch[0].Key.(sops.Comment); ok && c.Trailer {
+				heading.Trailer = "# " + c.Value
+				branch = branch[1:]
+			}
+		}
 		section = &tomledit.Section{Heading: heading}
 		doc.Sections = append(doc.Sections, section)
 	}
 
 	var pendingComments []string
 	var lastScalarKV *parser.KeyValue
+	var lastComplexKV *parser.KeyValue
 
 	for idx, item := range branch {
 		if c, ok := item.Key.(sops.Comment); ok {
@@ -638,11 +658,15 @@ func (store *Store) walkBranch(branch sops.TreeBranch, prefix []string, doc *tom
 					break
 				}
 			}
-			if !hasMoreData {
-				// Buffer to headingCommentBuf for next section
+			if c.Trailer && lastComplexKV != nil {
+				// Set as trailing comment on last complex KV.
+				lastComplexKV.Value.Trailer = "# " + c.Value
+				lastComplexKV = nil
+			} else if !hasMoreData {
+				// Buffer to headingCommentBuf for next section.
 				*headingCommentBuf = append(*headingCommentBuf, sops.TreeItem{Key: sops.Comment{Value: c.Value}, Value: nil})
 			} else if lastScalarKV != nil {
-				// Set as trailing comment on last scalar KV
+				// Set as trailing comment on last scalar KV.
 				lastScalarKV.Value.Trailer = "# " + c.Value
 				lastScalarKV = nil
 			} else {
@@ -663,6 +687,7 @@ func (store *Store) walkBranch(branch sops.TreeBranch, prefix []string, doc *tom
 			kvBlockForChild := pendingComments
 			pendingComments = nil
 			lastScalarKV = nil
+			lastComplexKV = nil
 
 			childPrefix := append(append([]string{}, prefix...), key)
 			store.walkBranch(subBranch, childPrefix, doc, headingCommentBuf, false)
@@ -679,6 +704,7 @@ func (store *Store) walkBranch(branch sops.TreeBranch, prefix []string, doc *tom
 			kvBlockForChild := pendingComments
 			pendingComments = nil
 			lastScalarKV = nil
+			lastComplexKV = nil
 
 			entryIdx := 0
 			for _, elem := range arr {
@@ -715,6 +741,7 @@ func (store *Store) walkBranch(branch sops.TreeBranch, prefix []string, doc *tom
 				pendingComments = nil
 			}
 			lastScalarKV = nil
+			lastComplexKV = kv
 		} else {
 			// Scalar value: pending comments → block
 			if len(pendingComments) > 0 {
@@ -722,6 +749,7 @@ func (store *Store) walkBranch(branch sops.TreeBranch, prefix []string, doc *tom
 				pendingComments = nil
 			}
 			lastScalarKV = kv
+			lastComplexKV = nil
 		}
 
 		section.Items = append(section.Items, kv)

@@ -103,6 +103,54 @@ y = 2
 `)
 }
 
+func testEncrypted() []byte {
+	return []byte(`# header comment
+key1 = "value1"
+key2 = 42  # trailing comment
+
+[nested]
+
+# nested comment
+x = 1
+
+[sops]
+  version = "3.7.0"
+  mac = "ENC[AES256_GCM,data:abc123,iv:def456,tag:ghi789,type:str]"
+  lastmodified = "2023-01-01T00:00:00Z"
+  mac_only_encrypted = false
+  unencrypted_suffix = "_unencrypted"
+
+  [[sops.kms]]
+    arn = "arn:aws:kms:us-east-1:123456789012:key/12345678-1234-1234-1234-123456789012"
+    created_at = "2023-01-01T00:00:00Z"
+    enc = "encrypted-data-key"
+`)
+}
+
+func testEncryptedEmitted() string {
+	return `# header comment
+key1 = "value1"
+key2 = 42  # trailing comment
+
+[nested]
+
+# nested comment
+x = 1
+
+[sops]
+  lastmodified = '2023-01-01T00:00:00Z'
+  mac = 'ENC[AES256_GCM,data:abc123,iv:def456,tag:ghi789,type:str]'
+  unencrypted_suffix = '_unencrypted'
+  version = '3.7.0'
+
+  [[sops.kms]]
+    arn = 'arn:aws:kms:us-east-1:123456789012:key/12345678-1234-1234-1234-123456789012'
+    created_at = '2023-01-01T00:00:00Z'
+    enc = 'encrypted-data-key'
+    aws_profile = ''
+`
+}
+
 func testTreeBranches() sops.TreeBranches {
 	return sops.TreeBranches{
 		sops.TreeBranch{
@@ -110,7 +158,7 @@ func testTreeBranches() sops.TreeBranches {
 				Key: sops.Comment{
 					Value: "0 comment",
 				},
-				Value: interface{}(nil),
+				Value: nil,
 			},
 			sops.TreeItem{
 				Key:   "0",
@@ -122,9 +170,10 @@ func testTreeBranches() sops.TreeBranches {
 			},
 			sops.TreeItem{
 				Key: sops.Comment{
-					Value: "1 comment",
+					Value:   "1 comment",
+					Trailer: true,
 				},
-				Value: interface{}(nil),
+				Value: nil,
 			},
 			sops.TreeItem{
 				Key: "1a",
@@ -132,7 +181,7 @@ func testTreeBranches() sops.TreeBranches {
 					sops.Comment{Value: "one-a-1"},
 					"one-a-1",
 					"one-a-2",
-					sops.Comment{Value: "one-a-2"},
+					sops.Comment{Value: "one-a-2", Trailer: true},
 				},
 			},
 			sops.TreeItem{
@@ -142,7 +191,7 @@ func testTreeBranches() sops.TreeBranches {
 						Key: sops.Comment{
 							Value: "x comment",
 						},
-						Value: interface{}(nil),
+						Value: nil,
 					},
 					sops.TreeItem{
 						Key:   "x",
@@ -158,23 +207,24 @@ func testTreeBranches() sops.TreeBranches {
 				Key: sops.Comment{
 					Value: "y comment",
 				},
-				Value: interface{}(nil),
+				Value: nil,
 			},
 			sops.TreeItem{
 				Key: "2",
 				Value: sops.TreeBranch{
-					sops.TreeItem{
-						Key: sops.Comment{
-							Value: "21 comment",
-						},
-						Value: interface{}(nil),
-					},
 					sops.TreeItem{
 						Key: "21",
 						Value: []any{
 							21.1,
 							21.2,
 						},
+					},
+					sops.TreeItem{
+						Key: sops.Comment{
+							Value:   "21 comment",
+							Trailer: true,
+						},
+						Value: nil,
 					},
 					sops.TreeItem{
 						Key:   "22",
@@ -259,7 +309,7 @@ func testTreeBranchesEmitted() sops.TreeBranches {
 				Key: sops.Comment{
 					Value: "0 comment",
 				},
-				Value: interface{}(nil),
+				Value: nil,
 			},
 			sops.TreeItem{
 				Key:   "0",
@@ -271,9 +321,10 @@ func testTreeBranchesEmitted() sops.TreeBranches {
 			},
 			sops.TreeItem{
 				Key: sops.Comment{
-					Value: "1 comment",
+					Value:   "1 comment",
+					Trailer: true,
 				},
-				Value: interface{}(nil),
+				Value: nil,
 			},
 			sops.TreeItem{
 				Key: "1a",
@@ -281,7 +332,7 @@ func testTreeBranchesEmitted() sops.TreeBranches {
 					sops.Comment{Value: "one-a-1"},
 					"one-a-1",
 					"one-a-2",
-					sops.Comment{Value: "one-a-2"},
+					sops.Comment{Value: "one-a-2", Trailer: true},
 				},
 			},
 			// In the emitted section form, "x comment" moves from inside
@@ -290,7 +341,7 @@ func testTreeBranchesEmitted() sops.TreeBranches {
 				Key: sops.Comment{
 					Value: "x comment",
 				},
-				Value: interface{}(nil),
+				Value: nil,
 			},
 			sops.TreeItem{
 				Key: "1b",
@@ -309,23 +360,24 @@ func testTreeBranchesEmitted() sops.TreeBranches {
 				Key: sops.Comment{
 					Value: "y comment",
 				},
-				Value: interface{}(nil),
+				Value: nil,
 			},
 			sops.TreeItem{
 				Key: "2",
 				Value: sops.TreeBranch{
-					sops.TreeItem{
-						Key: sops.Comment{
-							Value: "21 comment",
-						},
-						Value: interface{}(nil),
-					},
 					sops.TreeItem{
 						Key: "21",
 						Value: []any{
 							21.1,
 							21.2,
 						},
+					},
+					sops.TreeItem{
+						Key: sops.Comment{
+							Value:   "21 comment",
+							Trailer: true,
+						},
+						Value: nil,
 					},
 					sops.TreeItem{
 						Key:   "22",
@@ -470,6 +522,9 @@ func TestLoadPlainFileRoundTrip(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, testTreeBranchesEmitted(), branches2)
 
+	// Verify the emitted TOML includes all data and comments.
+	assert.Equal(t, string(emitted), string(testPlainEmitted()))
+
 	// Emit again — should be byte-identical (stable)
 	emitted2, err := (&Store{}).EmitPlainFile(branches2)
 	require.NoError(t, err)
@@ -479,50 +534,30 @@ func TestLoadPlainFileRoundTrip(t *testing.T) {
 func TestLoadEncryptedFileRoundTrip(t *testing.T) {
 	t.Parallel()
 
-	data := []byte(`# header comment
-key1 = "value1"
-key2 = 42  # trailing comment
-
-[nested]
-
-# nested comment
-x = 1
-
-[sops]
-  version = "3.7.0"
-  mac = "ENC[AES256_GCM,data:abc123,iv:def456,tag:ghi789,type:str]"
-  lastmodified = "2023-01-01T00:00:00Z"
-  mac_only_encrypted = false
-  unencrypted_suffix = "_unencrypted"
-
-  [[sops.kms]]
-    arn = "arn:aws:kms:us-east-1:123456789012:key/12345678-1234-1234-1234-123456789012"
-    created_at = "2023-01-01T00:00:00Z"
-    enc = "encrypted-data-key"
-`)
-
-	tree, err := (&Store{}).LoadEncryptedFile(data)
+	tree, err := (&Store{}).LoadEncryptedFile(testEncrypted())
 	require.NoError(t, err)
 
-	// Emit and load again
+	// Emit and load again.
 	emitted, err := (&Store{}).EmitEncryptedFile(tree)
 	require.NoError(t, err)
 
 	tree2, err := (&Store{}).LoadEncryptedFile(emitted)
 	require.NoError(t, err)
 
-	// Data branches should match (including comments and order)
-	require.Equal(t, len(tree.Branches), len(tree2.Branches))
+	// Data branches should match (including comments and order).
 	assert.Equal(t, tree.Branches, tree2.Branches)
 
-	// Metadata should fully survive
+	// Metadata should fully survive.
 	assert.Equal(t, tree.Metadata.Version, tree2.Metadata.Version)
 	assert.Equal(t, tree.Metadata.MessageAuthenticationCode, tree2.Metadata.MessageAuthenticationCode)
 	assert.Equal(t, tree.Metadata.UnencryptedSuffix, tree2.Metadata.UnencryptedSuffix)
 	assert.Equal(t, tree.Metadata.MACOnlyEncrypted, tree2.Metadata.MACOnlyEncrypted)
 	assert.Equal(t, len(tree.Metadata.KeyGroups), len(tree2.Metadata.KeyGroups))
 
-	// Emit again — should be byte-identical (stable)
+	// Verify the emitted TOML includes all data, comments, and metadata.
+	assert.Equal(t, testEncryptedEmitted(), string(emitted))
+
+	// Emit again — should be byte-identical (stable).
 	emitted2, err := (&Store{}).EmitEncryptedFile(tree2)
 	require.NoError(t, err)
 	assert.Equal(t, string(emitted), string(emitted2))
@@ -636,33 +671,25 @@ func TestHasSopsTopLevelKey(t *testing.T) {
 func TestLoadEncryptedFile(t *testing.T) {
 	t.Parallel()
 
-	// Create a sample encrypted TOML with metadata
-	data := []byte(`key1 = "value1"
-key2 = 42
+	tree, err := (&Store{}).LoadEncryptedFile(testEncrypted())
+	require.NoError(t, err)
 
-[sops]
-  version = "3.7.0"
-  mac = "ENC[AES256_GCM,data:abc123,iv:def456,tag:ghi789,type:str]"
-  lastmodified = "2023-01-01T00:00:00Z"
-
-  [[sops.kms]]
-    arn = "arn:aws:kms:us-east-1:123456789012:key/12345678-1234-1234-1234-123456789012"
-    created_at = "2023-01-01T00:00:00Z"
-    enc = "encrypted-data-key"
-`)
-
-	tree, err := (&Store{}).LoadEncryptedFile(data)
-	assert.Nil(t, err)
-
-	// Verify metadata was loaded
-	assert.NotNil(t, tree.Metadata)
+	// Verify metadata was loaded.
 	assert.Equal(t, "3.7.0", tree.Metadata.Version)
 	assert.Equal(t, "ENC[AES256_GCM,data:abc123,iv:def456,tag:ghi789,type:str]", tree.Metadata.MessageAuthenticationCode)
+	assert.Equal(t, "_unencrypted", tree.Metadata.UnencryptedSuffix)
+	assert.Equal(t, 1, len(tree.Metadata.KeyGroups))
 
-	// Verify data was loaded
-	assert.Equal(t, 1, len(tree.Branches))
-	// The branch should contain key1, key2, and sops
-	assert.GreaterOrEqual(t, len(tree.Branches[0]), 2)
+	// Verify data was loaded (sops key removed, data keys remain).
+	require.Equal(t, 1, len(tree.Branches))
+	branch := tree.Branches[0]
+
+	// Should have data items but no "sops" key.
+	for _, item := range branch {
+		if key, ok := item.Key.(string); ok {
+			assert.NotEqual(t, "sops", key)
+		}
+	}
 }
 
 func TestEmitEncryptedFile(t *testing.T) {
@@ -995,7 +1022,7 @@ exponent = 5e+22
 func TestInlineTableComments(t *testing.T) {
 	t.Parallel()
 
-	data := []byte(`point = {
+	data := []byte(`point = { # a point
     # x coordinate
     x = 1,
     y = 2,  # y coordinate
@@ -1017,18 +1044,28 @@ func TestInlineTableComments(t *testing.T) {
 	require.NotNil(t, pointValue)
 
 	expected := sops.TreeBranch{
-		sops.TreeItem{Key: sops.Comment{Value: "x coordinate"}, Value: interface{}(nil)},
+		sops.TreeItem{Key: sops.Comment{Value: "a point", Trailer: true}, Value: nil},
+		sops.TreeItem{Key: sops.Comment{Value: "x coordinate"}, Value: nil},
 		sops.TreeItem{Key: "x", Value: int64(1)},
 		sops.TreeItem{Key: "y", Value: int64(2)},
-		sops.TreeItem{Key: sops.Comment{Value: "y coordinate"}, Value: interface{}(nil)},
+		sops.TreeItem{Key: sops.Comment{Value: "y coordinate", Trailer: true}, Value: nil},
 	}
 	assert.Equal(t, expected, pointValue)
 
 	// Inline tables become sections on emit, so comment positions shift.
-	// Verify emit → load → emit stability instead.
 	emitted, err := (&Store{}).EmitPlainFile(branches)
 	require.NoError(t, err)
 
+	// Verify the emitted TOML includes all data and comments.
+	expectedEmitted := `[point]  # a point
+
+# x coordinate
+x = 1
+y = 2  # y coordinate
+`
+	assert.Equal(t, expectedEmitted, string(emitted))
+
+	// Verify emit → load → emit stability.
 	branches2, err := (&Store{}).LoadPlainFile(emitted)
 	require.NoError(t, err)
 
@@ -1104,9 +1141,9 @@ func TestArrayTrailingComments(t *testing.T) {
 
 	expected := []any{
 		int64(80),
-		sops.Comment{Value: "HTTP"},
+		sops.Comment{Value: "HTTP", Trailer: true},
 		int64(443),
-		sops.Comment{Value: "HTTPS"},
+		sops.Comment{Value: "HTTPS", Trailer: true},
 	}
 	assert.Equal(t, expected, portsValue)
 
