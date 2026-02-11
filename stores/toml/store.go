@@ -796,7 +796,7 @@ func (store *Store) EmitExample() []byte {
 // --- LoadEncryptedFile ---
 
 func (store *Store) LoadEncryptedFile(in []byte) (sops.Tree, error) {
-	// Use pelletier/go-toml to unmarshal metadata
+	// Use pelletier/go-toml/v2 to unmarshal metadata.
 	var sopsFile stores.SopsFile
 	if err := toml.Unmarshal(in, &sopsFile); err != nil {
 		return sops.Tree{}, fmt.Errorf("could not unmarshal TOML: %w", err)
@@ -810,19 +810,17 @@ func (store *Store) LoadEncryptedFile(in []byte) (sops.Tree, error) {
 		return sops.Tree{}, err
 	}
 
-	// Load data using our AST parser
+	// Load data using the AST parser.
 	branches, err := store.LoadPlainFile(in)
 	if err != nil {
 		return sops.Tree{}, fmt.Errorf("could not load TOML data: %w", err)
 	}
 
-	// Remove "sops" key from branches
-	for bi, branch := range branches {
-		for i, item := range branch {
-			if key, ok := item.Key.(string); ok && key == stores.SopsMetadataKey {
-				branches[bi] = append(branch[:i], branch[i+1:]...)
-				break
-			}
+	// Remove the "sops" key from branches.
+	for i, item := range branches[0] {
+		if key, ok := item.Key.(string); ok && key == stores.SopsMetadataKey {
+			branches[0] = append(branches[0][:i], branches[0][i+1:]...)
+			break
 		}
 	}
 
