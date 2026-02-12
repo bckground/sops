@@ -158,4 +158,4 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
-replace github.com/pelletier/go-toml/v2 => github.com/bckground/go-toml/v2 v2.0.0-20260213103832-f97ebc2b5f5e
+replace github.com/pelletier/go-toml/v2 => github.com/bckground/go-toml/v2 v2.0.0-20260223105342-75f6f26a6cd7
